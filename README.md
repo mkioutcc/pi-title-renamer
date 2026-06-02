@@ -1,132 +1,91 @@
 # pi-title-renamer
 
-`pi-title-renamer` is a Pi package that automatically gives each Pi terminal tab a short, readable title after the first assistant response in a session.
+`pi-title-renamer` is a Pi package that automatically renames the terminal tab after the first assistant reply in a session.
 
-It is useful when you keep multiple Pi sessions open and want terminal tabs to reflect the actual conversation topic instead of only the working directory.
-
-## Features
-
-- Generates a concise terminal tab title after the first completed assistant response.
-- Uses the active Pi model by default with `model: "inherit"`.
-- Normalizes generated titles to the shape `topic｜project-name` when project names are enabled.
-- Supports manual title changes with `/rename-title <text>`.
-- Supports reset with `/rename-title --reset` so a later full turn can auto-rename again.
-- Stores its own state as custom Pi session entries and does not inject that state into the LLM context.
-- Has optional Pi session-name syncing through configuration.
-- Uses no runtime dependencies beyond Pi peer packages.
-
-## Requirements
-
-- Pi coding agent with package support.
-- A configured Pi model if you want model-generated titles.
-
-If model generation fails, the extension falls back to a deterministic title such as `Pi｜project-name`.
+It is meant for people who keep several Pi sessions open and want each terminal tab to show the conversation topic instead of only the working directory.
 
 ## Install
-
-After this package is published to npm:
 
 ```bash
 pi install npm:pi-title-renamer
 ```
 
-You can also install it from a Git repository:
+Restart Pi after installing. The next new conversation will be renamed after the first assistant response completes.
 
-```bash
-pi install git:github.com/<user>/pi-title-renamer
-```
-
-For local development from this repository:
+To try the package from a local checkout:
 
 ```bash
 pi install ./pi-title-renamer
 ```
 
-To try it for one run without installing it:
+To run it once without installing:
 
 ```bash
 cd pi-title-renamer
 pi -e ./extensions/title-renamer/index.ts
 ```
 
-## Update or remove
+## Usage
 
-Update installed Pi packages:
+Start Pi normally and send your first message. After the first assistant response finishes, the extension asks the active Pi model for a short title and applies it to the terminal tab.
 
-```bash
-pi update --extensions
+Generated titles are normalized to this shape by default:
+
+```text
+topic｜project-name
 ```
 
-Update only this package after it is published to npm:
+For example:
 
-```bash
-pi update npm:pi-title-renamer
+```text
+Auth Debugging｜my-app
 ```
 
-Remove the npm package:
+If model generation fails, the fallback title uses this shape:
 
-```bash
-pi remove npm:pi-title-renamer
+```text
+Pi｜project-name
 ```
-
-If you installed from a local path, run `pi list` and remove the exact source shown there.
-
-## Default behavior
-
-By default, the package:
-
-- listens for the first `agent_end` that has a first user message and a first assistant message;
-- uses `model: "inherit"`, meaning the active Pi model from `ctx.model`;
-- asks the model for a single-line title;
-- sanitizes the model output before use;
-- normalizes model titles to use the project name as a suffix, for example `debug auth｜my-project`;
-- calls `ctx.ui.setTitle(title)` in interactive UI mode;
-- retries title application briefly to reduce terminal title race conditions;
-- does not call `pi.setSessionName()` unless configured;
-- appends a `title-renamer-state` custom entry so the same session is not automatically renamed again.
-
-A title shaped like `topic｜project-name` is normal model output. A title shaped like `Pi｜project-name` is the default fallback.
 
 ## Commands
 
-### `/rename-title`
+| Command | Description |
+|---|---|
+| `/rename-title` | Generate a new title with the configured model and apply it immediately. |
+| `/rename-title <text>` | Use the provided text as the title without calling a model. |
+| `/rename-title --show-config` | Show the merged config, config paths, and config warnings. |
+| `/rename-title --reset` | Allow the next complete user-and-assistant turn to auto-rename again. |
 
-Regenerate a title using the merged configuration and apply it. Manual regeneration ignores the automatic rename state.
-
-### `/rename-title <text>`
-
-Use `<text>` as the title without calling a model. The text is still sanitized and truncated according to `style.maxChars`.
-
-Example:
+Examples:
 
 ```text
 /rename-title Manual test title
 ```
 
-### `/rename-title --show-config`
+```text
+/rename-title --reset
+```
 
-Show the current merged configuration, the two config paths, and any config warnings.
-
-### `/rename-title --reset`
-
-Append a reset state entry. This does not delete older custom entries and does not immediately rename the tab. It allows the next complete user-and-assistant turn to run automatic naming again.
+`--reset` does not rename immediately. It only clears the automatic rename state so the next full turn can generate a new title.
 
 ## Configuration
 
-Configuration is read from two JSON files. Project configuration overrides global configuration, and nested objects are merged structurally.
+Configuration is optional. If no config file exists, defaults are used.
 
-1. Global: `~/.pi/agent/title-renamer.json`
-2. Project: `<cwd>/.pi/title-renamer.json`
+Config is loaded from two places:
 
-On Windows, the global config path is typically:
+1. Global config: `~/.pi/agent/title-renamer.json`
+2. Project config: `<cwd>/.pi/title-renamer.json`
+
+Project config overrides global config. Nested objects are merged.
+
+On Windows, the global path is usually:
 
 ```text
 C:\Users\<you>\.pi\agent\title-renamer.json
 ```
 
-The config file is not created automatically. Create it manually if you want to override defaults.
-
-Default configuration:
+Default config:
 
 ```json
 {
@@ -158,17 +117,28 @@ Default configuration:
 }
 ```
 
-### Example: use an explicit model
+### Use a specific model
+
+By default, `model` is `"inherit"`, which means the extension uses the active Pi model.
+
+To use a specific model:
 
 ```json
 {
-  "model": "caprouter/gpt-5.5"
+  "model": "provider/model-id"
 }
 ```
 
-`"inherit"` uses the current Pi model. A value shaped like `"provider/model-id"` resolves through Pi's model registry. Only the first slash separates provider from model id.
+Only the first slash separates provider from model id. For example, `openrouter/anthropic/claude-sonnet` means:
 
-### Example: also rename the Pi session
+- provider: `openrouter`
+- model id: `anthropic/claude-sonnet`
+
+### Also rename the Pi session
+
+Terminal tab renaming is enabled by default. Pi session-name syncing is disabled by default.
+
+To enable both:
 
 ```json
 {
@@ -180,9 +150,7 @@ Default configuration:
 }
 ```
 
-When `apply.sessionName` is `true`, manual `/rename-title <text>` updates the Pi session name. Automatic rename only overwrites an existing session name when `apply.overwriteSessionName` is `true`.
-
-### Example: disable project suffix
+### Disable project suffix
 
 ```json
 {
@@ -195,54 +163,22 @@ When `apply.sessionName` is `true`, manual `/rename-title <text>` updates the Pi
 }
 ```
 
-## Sanitization
+## Troubleshooting
 
-Generated and manually supplied titles are sanitized before use:
-
-- ANSI escape sequences are removed.
-- Control characters are removed.
-- Newlines are collapsed by selecting the first valid candidate.
-- Wrapping quotes, backticks, code fences, and common Markdown markers are removed.
-- Markdown links, bullets, headings, and numbered-list prefixes are stripped.
-- The result is truncated to `style.maxChars` Unicode code points.
+| Symptom | Cause | Fix |
+|---|---|---|
+| Title does not change after installing | The current Pi process has not loaded the package yet. | Restart Pi or run `/reload`. |
+| `/rename-title --reset` does not change the title immediately | Reset only clears auto-rename state. | Send a new message and wait for the assistant reply to finish. |
+| Title is `Pi｜project-name` | Model generation failed and fallback was used. | Check model credentials or run `/rename-title --show-config`. |
+| Manual title is truncated | `style.maxChars` limits title length. | Increase `style.maxChars` in config. |
+| Terminal tab still ignores title changes | Some terminals or shells can override OSC title updates. | Try another terminal or check terminal title/profile settings. |
 
 ## Development
 
-Run the unit tests from the package directory:
+Run tests from the package directory:
 
 ```bash
 npm test
 ```
 
-This package intentionally declares only Pi peer dependencies. Tests use Node built-ins and Node's native TypeScript type stripping.
-
-## Publish checklist
-
-Before publishing publicly:
-
-1. Make sure `package.json` has the final package name, version, description, and `pi-package` keyword.
-2. Run tests:
-
-   ```bash
-   npm test
-   ```
-
-3. Preview the npm tarball:
-
-   ```bash
-   npm pack --dry-run
-   ```
-
-4. Publish to npm:
-
-   ```bash
-   npm publish
-   ```
-
-5. After npm publish, users can install it with:
-
-   ```bash
-   pi install npm:pi-title-renamer
-   ```
-
-Pi's package gallery at `https://pi.dev/packages` discovers packages tagged with the `pi-package` keyword. You can add `pi.image` or `pi.video` metadata in `package.json` if you want a gallery preview.
+Pi loads TypeScript extensions directly, so this package ships source files under `extensions/` and has no build step.

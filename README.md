@@ -101,7 +101,7 @@ Default config:
     "overwriteSessionName": false
   },
   "style": {
-    "language": "zh-TW",
+    "language": "en",
     "maxChars": 24,
     "includeProject": true,
     "separator": "｜"
@@ -118,6 +118,66 @@ Default config:
   }
 }
 ```
+
+### Configuration fields
+
+| Field | Type | Default | Description |
+|---|---:|---|---|
+| `enabled` | boolean | `true` | Enables automatic title renaming. Manual commands remain available for changing titles and inspecting config. |
+| `auto` | boolean | `true` | Runs automatic renaming after the configured trigger. Set to `false` if you only want manual `/rename-title` commands. |
+| `trigger` | string | `"first-agent-end"` | Automatic rename timing. Currently the only supported value is `"first-agent-end"`, meaning after the first assistant response completes. Unsupported values fall back to the default and show a config warning. |
+| `model` | string | `"inherit"` | Model used to generate titles. Use `"inherit"` for the active Pi model or `"provider/model-id"` for a specific model. |
+| `apply.terminalTitle` | boolean | `true` | Apply the generated title to the terminal window or tab. |
+| `apply.sessionName` | boolean | `false` | Also set Pi's session name. |
+| `apply.overwriteSessionName` | boolean | `false` | Allow automatic rename to overwrite an existing Pi session name when `apply.sessionName` is enabled. Manual `/rename-title <text>` can still update it. |
+| `style.language` | string | `"en"` | Free-form language instruction sent to the model. This is not a fixed enum. |
+| `style.maxChars` | number | `24` | Maximum title length in Unicode code points after sanitization. |
+| `style.includeProject` | boolean | `true` | Ask for and normalize generated titles with the project name suffix, such as `topic｜project-name`. |
+| `style.separator` | string | `"｜"` | Separator between topic and project name. |
+| `input.includeFirstUserMessage` | boolean | `true` | Include the first user message in the title-generation prompt. |
+| `input.includeFirstAssistantMessage` | boolean | `true` | Include the first assistant response in the title-generation prompt. |
+| `input.includeCwd` | boolean | `true` | Include the current working directory in the title-generation prompt. |
+| `input.includeModel` | boolean | `false` | Include the active model name in the title-generation prompt. |
+| `fallback.useProjectName` | boolean | `true` | Include the project name in fallback titles. |
+| `fallback.prefix` | string | `"Pi"` | Prefix used when fallback is needed. With defaults, fallback looks like `Pi｜project-name`. |
+
+### Automatic rename timing
+
+`trigger` currently supports one value:
+
+```json
+{ "trigger": "first-agent-end" }
+```
+
+This means the extension waits until the first user message has received its first assistant response, then generates and applies a title once.
+
+To turn off automatic rename but keep manual commands:
+
+```json
+{
+  "auto": false
+}
+```
+
+### Title language
+
+`style.language` is a free-form language instruction sent to the model. You can use a locale code or a plain-language description.
+
+Common examples:
+
+```json
+{ "style": { "language": "en" } }
+```
+
+```json
+{ "style": { "language": "zh-TW" } }
+```
+
+```json
+{ "style": { "language": "繁體中文，簡短自然" } }
+```
+
+The default is `"en"`.
 
 ### Use a specific model
 

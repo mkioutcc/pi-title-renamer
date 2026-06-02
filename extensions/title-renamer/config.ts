@@ -56,7 +56,7 @@ export const DEFAULT_CONFIG: TitleRenamerConfig = {
 		overwriteSessionName: false,
 	},
 	style: {
-		language: "zh-TW",
+		language: "en",
 		maxChars: 24,
 		includeProject: true,
 		separator: "｜",
@@ -84,7 +84,10 @@ const cloneConfig = (config: TitleRenamerConfig): TitleRenamerConfig => ({
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 	!!value && typeof value === "object" && !Array.isArray(value);
 
-export function mergeConfig(base: TitleRenamerConfig, override: unknown): TitleRenamerConfig {
+export function mergeConfig(
+	base: TitleRenamerConfig,
+	override: unknown,
+): TitleRenamerConfig {
 	if (!isPlainObject(override)) {
 		return cloneConfig(base);
 	}
@@ -102,31 +105,55 @@ export function mergeConfig(base: TitleRenamerConfig, override: unknown): TitleR
 	return merged as unknown as TitleRenamerConfig;
 }
 
-function validateBoolean(value: unknown, fallback: boolean, key: string, warnings: string[]): boolean {
+function validateBoolean(
+	value: unknown,
+	fallback: boolean,
+	key: string,
+	warnings: string[],
+): boolean {
 	if (typeof value === "boolean") {
 		return value;
 	}
-	warnings.push(`Invalid title-renamer config ${key}; using default ${String(fallback)}.`);
+	warnings.push(
+		`Invalid title-renamer config ${key}; using default ${String(fallback)}.`,
+	);
 	return fallback;
 }
 
-function validateString(value: unknown, fallback: string, key: string, warnings: string[]): string {
+function validateString(
+	value: unknown,
+	fallback: string,
+	key: string,
+	warnings: string[],
+): string {
 	if (typeof value === "string") {
 		return value;
 	}
-	warnings.push(`Invalid title-renamer config ${key}; using default ${JSON.stringify(fallback)}.`);
+	warnings.push(
+		`Invalid title-renamer config ${key}; using default ${JSON.stringify(fallback)}.`,
+	);
 	return fallback;
 }
 
-function validatePositiveInteger(value: unknown, fallback: number, key: string, warnings: string[]): number {
+function validatePositiveInteger(
+	value: unknown,
+	fallback: number,
+	key: string,
+	warnings: string[],
+): number {
 	if (Number.isInteger(value) && typeof value === "number" && value > 0) {
 		return value;
 	}
-	warnings.push(`Invalid title-renamer config ${key}; using default ${String(fallback)}.`);
+	warnings.push(
+		`Invalid title-renamer config ${key}; using default ${String(fallback)}.`,
+	);
 	return fallback;
 }
 
-export function validateConfig(input: unknown): { config: TitleRenamerConfig; warnings: string[] } {
+export function validateConfig(input: unknown): {
+	config: TitleRenamerConfig;
+	warnings: string[];
+} {
 	const warnings: string[] = [];
 	const raw = isPlainObject(input) ? input : {};
 	if (!isPlainObject(input)) {
@@ -138,18 +165,37 @@ export function validateConfig(input: unknown): { config: TitleRenamerConfig; wa
 	const rawInput = isPlainObject(raw.input) ? raw.input : {};
 	const rawFallback = isPlainObject(raw.fallback) ? raw.fallback : {};
 
-	const triggerValue = validateString(raw.trigger, DEFAULT_CONFIG.trigger, "trigger", warnings);
-	const trigger: TitleRenamerConfig["trigger"] = triggerValue === "first-agent-end" ? triggerValue : DEFAULT_CONFIG.trigger;
+	const triggerValue = validateString(
+		raw.trigger,
+		DEFAULT_CONFIG.trigger,
+		"trigger",
+		warnings,
+	);
+	const trigger: TitleRenamerConfig["trigger"] =
+		triggerValue === "first-agent-end" ? triggerValue : DEFAULT_CONFIG.trigger;
 	if (triggerValue !== "first-agent-end") {
-		warnings.push(`Unsupported title-renamer config trigger ${JSON.stringify(triggerValue)}; using default ${DEFAULT_CONFIG.trigger}.`);
+		warnings.push(
+			`Unsupported title-renamer config trigger ${JSON.stringify(triggerValue)}; using default ${DEFAULT_CONFIG.trigger}.`,
+		);
 	}
 
 	return {
 		config: {
-			enabled: validateBoolean(raw.enabled, DEFAULT_CONFIG.enabled, "enabled", warnings),
+			enabled: validateBoolean(
+				raw.enabled,
+				DEFAULT_CONFIG.enabled,
+				"enabled",
+				warnings,
+			),
 			auto: validateBoolean(raw.auto, DEFAULT_CONFIG.auto, "auto", warnings),
 			trigger,
-			model: validateString(raw.model, DEFAULT_CONFIG.model, "model", warnings).trim() || DEFAULT_CONFIG.model,
+			model:
+				validateString(
+					raw.model,
+					DEFAULT_CONFIG.model,
+					"model",
+					warnings,
+				).trim() || DEFAULT_CONFIG.model,
 			apply: {
 				terminalTitle: validateBoolean(
 					rawApply.terminalTitle,
@@ -157,7 +203,12 @@ export function validateConfig(input: unknown): { config: TitleRenamerConfig; wa
 					"apply.terminalTitle",
 					warnings,
 				),
-				sessionName: validateBoolean(rawApply.sessionName, DEFAULT_CONFIG.apply.sessionName, "apply.sessionName", warnings),
+				sessionName: validateBoolean(
+					rawApply.sessionName,
+					DEFAULT_CONFIG.apply.sessionName,
+					"apply.sessionName",
+					warnings,
+				),
 				overwriteSessionName: validateBoolean(
 					rawApply.overwriteSessionName,
 					DEFAULT_CONFIG.apply.overwriteSessionName,
@@ -166,15 +217,30 @@ export function validateConfig(input: unknown): { config: TitleRenamerConfig; wa
 				),
 			},
 			style: {
-				language: validateString(rawStyle.language, DEFAULT_CONFIG.style.language, "style.language", warnings),
-				maxChars: validatePositiveInteger(rawStyle.maxChars, DEFAULT_CONFIG.style.maxChars, "style.maxChars", warnings),
+				language: validateString(
+					rawStyle.language,
+					DEFAULT_CONFIG.style.language,
+					"style.language",
+					warnings,
+				),
+				maxChars: validatePositiveInteger(
+					rawStyle.maxChars,
+					DEFAULT_CONFIG.style.maxChars,
+					"style.maxChars",
+					warnings,
+				),
 				includeProject: validateBoolean(
 					rawStyle.includeProject,
 					DEFAULT_CONFIG.style.includeProject,
 					"style.includeProject",
 					warnings,
 				),
-				separator: validateString(rawStyle.separator, DEFAULT_CONFIG.style.separator, "style.separator", warnings),
+				separator: validateString(
+					rawStyle.separator,
+					DEFAULT_CONFIG.style.separator,
+					"style.separator",
+					warnings,
+				),
 			},
 			input: {
 				includeFirstUserMessage: validateBoolean(
@@ -189,8 +255,18 @@ export function validateConfig(input: unknown): { config: TitleRenamerConfig; wa
 					"input.includeFirstAssistantMessage",
 					warnings,
 				),
-				includeCwd: validateBoolean(rawInput.includeCwd, DEFAULT_CONFIG.input.includeCwd, "input.includeCwd", warnings),
-				includeModel: validateBoolean(rawInput.includeModel, DEFAULT_CONFIG.input.includeModel, "input.includeModel", warnings),
+				includeCwd: validateBoolean(
+					rawInput.includeCwd,
+					DEFAULT_CONFIG.input.includeCwd,
+					"input.includeCwd",
+					warnings,
+				),
+				includeModel: validateBoolean(
+					rawInput.includeModel,
+					DEFAULT_CONFIG.input.includeModel,
+					"input.includeModel",
+					warnings,
+				),
 			},
 			fallback: {
 				useProjectName: validateBoolean(
@@ -199,14 +275,22 @@ export function validateConfig(input: unknown): { config: TitleRenamerConfig; wa
 					"fallback.useProjectName",
 					warnings,
 				),
-				prefix: validateString(rawFallback.prefix, DEFAULT_CONFIG.fallback.prefix, "fallback.prefix", warnings),
+				prefix: validateString(
+					rawFallback.prefix,
+					DEFAULT_CONFIG.fallback.prefix,
+					"fallback.prefix",
+					warnings,
+				),
 			},
 		},
 		warnings,
 	};
 }
 
-function readConfigFile(filePath: string, options: Required<Pick<LoadConfigOptions, "readFile" | "exists">>): { value?: unknown; warnings: string[] } {
+function readConfigFile(
+	filePath: string,
+	options: Required<Pick<LoadConfigOptions, "readFile" | "exists">>,
+): { value?: unknown; warnings: string[] } {
 	if (!options.exists(filePath)) {
 		return { warnings: [] };
 	}
@@ -215,16 +299,23 @@ function readConfigFile(filePath: string, options: Required<Pick<LoadConfigOptio
 		return { value: JSON.parse(options.readFile(filePath)), warnings: [] };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		return { warnings: [`Could not read title-renamer config ${filePath}: ${message}`] };
+		return {
+			warnings: [`Could not read title-renamer config ${filePath}: ${message}`],
+		};
 	}
 }
 
-export function loadConfig(cwd = process.cwd(), options: LoadConfigOptions = {}): LoadedConfig {
+export function loadConfig(
+	cwd = process.cwd(),
+	options: LoadConfigOptions = {},
+): LoadedConfig {
 	const homeDir = options.homeDir ?? os.homedir();
 	const globalPath = path.join(homeDir, ".pi", "agent", "title-renamer.json");
 	const projectPath = path.join(cwd, ".pi", "title-renamer.json");
 	const fsOptions = {
-		readFile: options.readFile ?? ((filePath: string) => fs.readFileSync(filePath, "utf8")),
+		readFile:
+			options.readFile ??
+			((filePath: string) => fs.readFileSync(filePath, "utf8")),
 		exists: options.exists ?? ((filePath: string) => fs.existsSync(filePath)),
 	};
 

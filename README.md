@@ -4,6 +4,8 @@
 
 It is meant for people who keep several Pi sessions open and want each terminal tab to show the conversation topic instead of only the working directory.
 
+Repository: <https://github.com/mkioutcc/pi-title-renamer>
+
 ## Install
 
 ```bash
@@ -182,3 +184,7 @@ npm test
 ```
 
 Pi loads TypeScript extensions directly, so this package ships source files under `extensions/` and has no build step.
+
+## License
+
+MIT

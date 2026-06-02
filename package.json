@@ -1,10 +1,19 @@
 {
   "name": "pi-title-renamer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Automatically rename Pi terminal tabs after the first assistant reply.",
   "type": "module",
+  "license": "MIT",
   "keywords": ["pi-package", "pi-extension", "terminal-title"],
-  "files": ["extensions", "README.md"],
+  "files": ["extensions", "README.md", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mkioutcc/pi-title-renamer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mkioutcc/pi-title-renamer/issues"
+  },
+  "homepage": "https://github.com/mkioutcc/pi-title-renamer#readme",
   "pi": {
     "extensions": ["./extensions/title-renamer"]
   },

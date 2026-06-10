@@ -17,7 +17,8 @@ import {
 import { sanitizeTitle } from "./sanitize.ts";
 import {
 	appendTitleRenamerState,
-	hasAutoRenamed,
+	blocksAutoRename,
+	getLatestTitleToReapply,
 	makeTitleRenamerState,
 } from "./state.ts";
 
@@ -44,7 +45,8 @@ interface RenameCommandDedupe {
 const RENAME_COMMAND_NAME = "rename-title";
 const RENAME_COMMAND_TEXT = `/${RENAME_COMMAND_NAME}`;
 const COMMAND_DEDUPLICATION_MS = 500;
-const TITLE_REAPPLY_DELAYS_MS = [50, 250] as const;
+const TITLE_REAPPLY_DEBOUNCE_MS = 25;
+const TITLE_REAPPLY_DELAYS_MS = [0, 50, 250, 1000, 3000] as const;
 const RESET_AWARE_NAMING_CONTEXT: NamingContextOptions = {
 	afterLatestReset: true,
 };
@@ -163,9 +165,10 @@ function fallbackTitle(
 	config: TitleRenamerConfig,
 	ctx: ExtensionContext,
 	warnings: string[],
+	namingContext = collectNamingContext(ctx, config),
 ): string | undefined {
 	const fallback = sanitizeCandidate(
-		buildFallbackTitle(config, ctx.cwd),
+		buildFallbackTitle(config, ctx.cwd, namingContext),
 		config,
 		warnings,
 	);
@@ -187,13 +190,9 @@ async function renameFromModel(
 	const warnings: string[] = [];
 	let resolvedModel: string | undefined;
 	let title: string | undefined;
+	const namingContext = collectNamingContext(ctx, config, namingContextOptions);
 
 	try {
-		const namingContext = collectNamingContext(
-			ctx,
-			config,
-			namingContextOptions,
-		);
 		const generated = await generateTitle(ctx, config, namingContext);
 		resolvedModel = generated.resolvedModel;
 		const sanitizedTitle = sanitizeCandidate(generated.text, config, warnings);
@@ -209,7 +208,7 @@ async function renameFromModel(
 	}
 
 	if (!title) {
-		title = fallbackTitle(config, ctx, warnings);
+		title = fallbackTitle(config, ctx, warnings, namingContext);
 	}
 
 	const applied = title
@@ -264,8 +263,8 @@ async function handleAutoRename(
 		return;
 	}
 	if (
-		hasAutoRenamed(
-			ctx.sessionManager.getBranch() as Parameters<typeof hasAutoRenamed>[0],
+		blocksAutoRename(
+			ctx.sessionManager.getBranch() as Parameters<typeof blocksAutoRename>[0],
 		)
 	) {
 		return;
@@ -361,8 +360,57 @@ async function runRenameCommand(
 	}
 }
 
+type ReapplyTimer = ReturnType<typeof setTimeout> & { unref?: () => void };
+
+function clearReapplyTimer(timer: ReapplyTimer | undefined): void {
+	if (timer) {
+		clearTimeout(timer);
+	}
+}
+
+function reapplyPersistedTitle(ctx: ExtensionContext): void {
+	try {
+		const config = loadConfig(ctx.cwd).config;
+		if (!config.apply.terminalTitle || !ctx.hasUI) {
+			return;
+		}
+		const title = getLatestTitleToReapply(
+			ctx.sessionManager.getBranch() as Parameters<
+				typeof getLatestTitleToReapply
+			>[0],
+		);
+		if (title) {
+			scheduleTitleReapply(ctx, title);
+		}
+	} catch {
+		// Reapply can race with reload/session replacement; stale contexts are ignored.
+	}
+}
+
 export default function titleRenamer(pi: ExtensionAPI): void {
 	const commandDedupe: RenameCommandDedupe = { active: new Set() };
+	let pendingReapply: ReapplyTimer | undefined;
+
+	const schedulePersistedTitleReapply = (ctx: ExtensionContext): void => {
+		clearReapplyTimer(pendingReapply);
+		pendingReapply = setTimeout(() => {
+			pendingReapply = undefined;
+			reapplyPersistedTitle(ctx);
+		}, TITLE_REAPPLY_DEBOUNCE_MS) as ReapplyTimer;
+		pendingReapply.unref?.();
+	};
+
+	pi.on("session_start", (_event, ctx: ExtensionContext) => {
+		schedulePersistedTitleReapply(ctx);
+	});
+
+	pi.on("turn_end", (_event, ctx: ExtensionContext) => {
+		schedulePersistedTitleReapply(ctx);
+	});
+
+	pi.on("tool_execution_end", (_event, ctx: ExtensionContext) => {
+		schedulePersistedTitleReapply(ctx);
+	});
 
 	pi.on("agent_end", async (_event, ctx) => {
 		try {
@@ -375,7 +423,14 @@ export default function titleRenamer(pi: ExtensionAPI): void {
 					"warning",
 				);
 			}
+		} finally {
+			schedulePersistedTitleReapply(ctx);
 		}
+	});
+
+	pi.on("session_shutdown", () => {
+		clearReapplyTimer(pendingReapply);
+		pendingReapply = undefined;
 	});
 
 	pi.on("input", async (event, ctx) => {

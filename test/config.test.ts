@@ -3,7 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { DEFAULT_CONFIG, loadConfig } from "../extensions/title-renamer/config.ts";
+import {
+	DEFAULT_CONFIG,
+	loadConfig,
+} from "../extensions/title-renamer/config.ts";
 import { parseModelSpec } from "../extensions/title-renamer/generator.ts";
 
 function makeTempDir(): string {
@@ -25,6 +28,7 @@ test("loadConfig merges global and project config with nested project overrides"
 				apply: { sessionName: true },
 				style: { maxChars: 18, separator: " - " },
 				input: { includeModel: true },
+				generation: { timeoutMs: 3000 },
 			}),
 		);
 		fs.writeFileSync(
@@ -38,13 +42,17 @@ test("loadConfig merges global and project config with nested project overrides"
 		const loaded = loadConfig(cwd, { homeDir: home });
 		assert.deepEqual(loaded.warnings, []);
 		assert.equal(loaded.config.model, "openrouter/anthropic/claude-sonnet");
-		assert.equal(loaded.config.apply.terminalTitle, DEFAULT_CONFIG.apply.terminalTitle);
+		assert.equal(
+			loaded.config.apply.terminalTitle,
+			DEFAULT_CONFIG.apply.terminalTitle,
+		);
 		assert.equal(loaded.config.apply.sessionName, true);
 		assert.equal(loaded.config.apply.overwriteSessionName, true);
 		assert.equal(loaded.config.style.maxChars, 18);
 		assert.equal(loaded.config.style.separator, " - ");
 		assert.equal(loaded.config.style.language, "en");
 		assert.equal(loaded.config.input.includeModel, true);
+		assert.equal(loaded.config.generation.timeoutMs, 3000);
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}

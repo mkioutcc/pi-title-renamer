@@ -130,6 +130,33 @@ declare module "@earendil-works/pi-coding-agent" {
 		waitForIdle(): Promise<void>;
 	}
 
+	export interface SessionStartEvent {
+		type: "session_start";
+		reason: "startup" | "reload" | "new" | "resume" | "fork";
+		previousSessionFile?: string;
+	}
+
+	export interface SessionShutdownEvent {
+		type: "session_shutdown";
+		reason: "quit" | "reload" | "new" | "resume" | "fork";
+		targetSessionFile?: string;
+	}
+
+	export interface TurnEndEvent {
+		type: "turn_end";
+		turnIndex: number;
+		message: unknown;
+		toolResults: unknown[];
+	}
+
+	export interface ToolExecutionEndEvent {
+		type: "tool_execution_end";
+		toolCallId: string;
+		toolName: string;
+		result: unknown;
+		isError: boolean;
+	}
+
 	export interface AgentEndEvent {
 		type: "agent_end";
 		messages: unknown[];
@@ -149,6 +176,34 @@ declare module "@earendil-works/pi-coding-agent" {
 		| { action: "handled" };
 
 	export interface ExtensionAPI {
+		on(
+			event: "session_start",
+			handler: (
+				event: SessionStartEvent,
+				ctx: ExtensionContext,
+			) => Promise<void> | void,
+		): void;
+		on(
+			event: "session_shutdown",
+			handler: (
+				event: SessionShutdownEvent,
+				ctx: ExtensionContext,
+			) => Promise<void> | void,
+		): void;
+		on(
+			event: "turn_end",
+			handler: (
+				event: TurnEndEvent,
+				ctx: ExtensionContext,
+			) => Promise<void> | void,
+		): void;
+		on(
+			event: "tool_execution_end",
+			handler: (
+				event: ToolExecutionEndEvent,
+				ctx: ExtensionContext,
+			) => Promise<void> | void,
+		): void;
 		on(
 			event: "agent_end",
 			handler: (

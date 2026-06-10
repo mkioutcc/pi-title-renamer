@@ -60,9 +60,29 @@ function resolveModel(
 	return model;
 }
 
+function fallbackTopicFromUserMessage(
+	message: string | undefined,
+): string | undefined {
+	const firstLine = message
+		?.split(/[\r\n]+/)
+		.map((line) => line.trim())
+		.find(Boolean);
+	if (!firstLine) {
+		return undefined;
+	}
+
+	return firstLine
+		.replace(/^\/[\w:-]+\s*/, "")
+		.replace(/^[#>*+\-\d.)\s]+/, "")
+		.replace(/[`"'“”‘’*_~]/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 export function buildFallbackTitle(
 	config: TitleRenamerConfig,
 	cwd: string,
+	input: Pick<NamingContext, "firstUserMessage"> = {},
 ): string | undefined {
 	const projectName = path.basename(cwd).trim();
 	const prefix = config.fallback.prefix.trim();
@@ -70,7 +90,19 @@ export function buildFallbackTitle(
 		config.fallback.useProjectName &&
 		config.style.includeProject &&
 		projectName.length > 0;
+	const fallbackTopic = fallbackTopicFromUserMessage(input.firstUserMessage);
 
+	if (fallbackTopic && includeProject) {
+		return buildProjectSuffixTitle(
+			fallbackTopic,
+			projectName,
+			config.style.separator,
+			config.style.maxChars,
+		);
+	}
+	if (fallbackTopic) {
+		return truncateToMax(fallbackTopic, config.style.maxChars);
+	}
 	if (prefix && includeProject) {
 		return `${prefix}${config.style.separator}${projectName}`;
 	}
@@ -219,6 +251,24 @@ function buildPrompt(input: NamingContext, config: TitleRenamerConfig): string {
 	return lines.join("\n");
 }
 
+function createLinkedAbortController(parentSignal: AbortSignal | undefined): {
+	controller: AbortController;
+	dispose: () => void;
+} {
+	const controller = new AbortController();
+	const abort = () => controller.abort();
+	if (parentSignal?.aborted) {
+		abort();
+	} else {
+		parentSignal?.addEventListener("abort", abort, { once: true });
+	}
+
+	return {
+		controller,
+		dispose: () => parentSignal?.removeEventListener("abort", abort),
+	};
+}
+
 export async function generateTitle(
 	ctx: ExtensionContext,
 	config: TitleRenamerConfig,
@@ -236,25 +286,47 @@ export async function generateTitle(
 	}
 
 	const { complete } = await import("@earendil-works/pi-ai");
-	const response = await complete(
-		model,
-		{
-			messages: [
-				{
-					role: "user" as const,
-					content: [
-						{ type: "text" as const, text: buildPrompt(input, config) },
-					],
-					timestamp: Date.now(),
-				},
-			],
-		},
-		{
-			apiKey: auth.apiKey,
-			headers: auth.headers,
-			signal: ctx.signal,
-		},
-	);
+	const { controller, dispose } = createLinkedAbortController(ctx.signal);
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	const timeoutPromise = new Promise<never>((_resolve, reject) => {
+		timeout = setTimeout(() => {
+			controller.abort();
+			reject(
+				new Error(
+					`Title generation timed out after ${config.generation.timeoutMs}ms.`,
+				),
+			);
+		}, config.generation.timeoutMs);
+		(timeout as { unref?: () => void }).unref?.();
+	});
+
+	const response = await Promise.race([
+		complete(
+			model,
+			{
+				messages: [
+					{
+						role: "user" as const,
+						content: [
+							{ type: "text" as const, text: buildPrompt(input, config) },
+						],
+						timestamp: Date.now(),
+					},
+				],
+			},
+			{
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				signal: controller.signal,
+			},
+		),
+		timeoutPromise,
+	]).finally(() => {
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+		dispose();
+	});
 
 	const text = response.content
 		.filter(

@@ -82,6 +82,43 @@ export function hasAutoRenamed(entries: readonly CustomEntry[]): boolean {
 	return false;
 }
 
+export function blocksAutoRename(entries: readonly CustomEntry[]): boolean {
+	for (let index = entries.length - 1; index >= 0; index--) {
+		const entry = entries[index];
+		if (
+			entry?.type !== "custom" ||
+			entry.customType !== STATE_CUSTOM_TYPE ||
+			!isTitleRenamerState(entry.data)
+		) {
+			continue;
+		}
+		if (entry.data.reset) {
+			return false;
+		}
+		if (entry.data.autoRenamed || (entry.data.manual && !!entry.data.title)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+export function getLatestTitleToReapply(
+	entries: readonly CustomEntry[],
+): string | undefined {
+	for (let index = entries.length - 1; index >= 0; index--) {
+		const entry = entries[index];
+		if (
+			entry?.type === "custom" &&
+			entry.customType === STATE_CUSTOM_TYPE &&
+			isTitleRenamerState(entry.data) &&
+			entry.data.title
+		) {
+			return entry.data.title;
+		}
+	}
+	return undefined;
+}
+
 export function makeTitleRenamerState(input: {
 	autoRenamed: boolean;
 	title?: string;

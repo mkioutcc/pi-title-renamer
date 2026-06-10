@@ -24,6 +24,9 @@ export interface TitleRenamerConfig {
 		includeCwd: boolean;
 		includeModel: boolean;
 	};
+	generation: {
+		timeoutMs: number;
+	};
 	fallback: {
 		useProjectName: boolean;
 		prefix: string;
@@ -67,6 +70,9 @@ export const DEFAULT_CONFIG: TitleRenamerConfig = {
 		includeCwd: true,
 		includeModel: false,
 	},
+	generation: {
+		timeoutMs: 15000,
+	},
 	fallback: {
 		useProjectName: true,
 		prefix: "Pi",
@@ -78,6 +84,7 @@ const cloneConfig = (config: TitleRenamerConfig): TitleRenamerConfig => ({
 	apply: { ...config.apply },
 	style: { ...config.style },
 	input: { ...config.input },
+	generation: { ...config.generation },
 	fallback: { ...config.fallback },
 });
 
@@ -163,6 +170,7 @@ export function validateConfig(input: unknown): {
 	const rawApply = isPlainObject(raw.apply) ? raw.apply : {};
 	const rawStyle = isPlainObject(raw.style) ? raw.style : {};
 	const rawInput = isPlainObject(raw.input) ? raw.input : {};
+	const rawGeneration = isPlainObject(raw.generation) ? raw.generation : {};
 	const rawFallback = isPlainObject(raw.fallback) ? raw.fallback : {};
 
 	const triggerValue = validateString(
@@ -265,6 +273,14 @@ export function validateConfig(input: unknown): {
 					rawInput.includeModel,
 					DEFAULT_CONFIG.input.includeModel,
 					"input.includeModel",
+					warnings,
+				),
+			},
+			generation: {
+				timeoutMs: validatePositiveInteger(
+					rawGeneration.timeoutMs,
+					DEFAULT_CONFIG.generation.timeoutMs,
+					"generation.timeoutMs",
 					warnings,
 				),
 			},

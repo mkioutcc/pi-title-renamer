@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEFAULT_CONFIG } from "../extensions/title-renamer/config.ts";
-import { normalizeGeneratedTitle } from "../extensions/title-renamer/generator.ts";
+import {
+	buildFallbackTitle,
+	normalizeGeneratedTitle,
+} from "../extensions/title-renamer/generator.ts";
 
 test("normalizeGeneratedTitle moves project name to suffix", () => {
 	assert.equal(
@@ -32,4 +35,13 @@ test("normalizeGeneratedTitle appends project suffix within max length", () => {
 
 	assert.equal(Array.from(title).length <= config.style.maxChars, true);
 	assert.equal(title.endsWith("｜project"), true);
+});
+
+test("buildFallbackTitle can derive topic from first user message", () => {
+	assert.equal(
+		buildFallbackTitle(DEFAULT_CONFIG, "/tmp/pi-title-renamer", {
+			firstUserMessage: "修正標題被覆蓋問題\n其他細節",
+		}),
+		"修正標題被覆蓋｜pi-title-renamer",
+	);
 });

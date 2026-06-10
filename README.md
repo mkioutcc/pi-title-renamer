@@ -2,7 +2,7 @@
 
 `pi-title-renamer` is a Pi package that automatically renames the terminal tab after the first assistant reply in a session.
 
-It is meant for people who keep several Pi sessions open and want each terminal tab to show the conversation topic instead of only the working directory.
+It is meant for people who keep several Pi sessions open and want each terminal tab to show the conversation topic instead of only the working directory. After a title has been applied, the extension also re-applies the last known title around Pi lifecycle events so Pi's default terminal-title updates are less likely to overwrite it.
 
 Repository: <https://github.com/mkioutcc/pi-title-renamer>
 
@@ -43,7 +43,7 @@ For example:
 Auth Debugging｜my-app
 ```
 
-If model generation fails, the fallback title uses this shape:
+If model generation fails, the fallback title first tries to derive a short topic from the first user message. If that is unavailable, it uses this shape:
 
 ```text
 Pi｜project-name
@@ -67,6 +67,8 @@ Examples:
 ```text
 /rename-title --reset
 ```
+
+Manual `/rename-title <text>` titles are treated as user-owned and block automatic renaming until `/rename-title --reset` is used.
 
 `--reset` does not rename immediately. It only clears the automatic rename state so the next full turn can generate a new title.
 
@@ -112,6 +114,9 @@ Default config:
     "includeCwd": true,
     "includeModel": false
   },
+  "generation": {
+    "timeoutMs": 5000
+  },
   "fallback": {
     "useProjectName": true,
     "prefix": "Pi"
@@ -138,6 +143,7 @@ Default config:
 | `input.includeFirstAssistantMessage` | boolean | `true` | Include the first assistant response in the title-generation prompt. |
 | `input.includeCwd` | boolean | `true` | Include the current working directory in the title-generation prompt. |
 | `input.includeModel` | boolean | `false` | Include the active model name in the title-generation prompt. |
+| `generation.timeoutMs` | number | `5000` | Maximum time to wait for model title generation before falling back. |
 | `fallback.useProjectName` | boolean | `true` | Include the project name in fallback titles. |
 | `fallback.prefix` | string | `"Pi"` | Prefix used when fallback is needed. With defaults, fallback looks like `Pi｜project-name`. |
 
@@ -233,7 +239,7 @@ To enable both:
 | `/rename-title --reset` does not change the title immediately | Reset only clears auto-rename state. | Send a new message and wait for the assistant reply to finish. |
 | Title is `Pi｜project-name` | Model generation failed and fallback was used. | Check model credentials or run `/rename-title --show-config`. |
 | Manual title is truncated | `style.maxChars` limits title length. | Increase `style.maxChars` in config. |
-| Terminal tab still ignores title changes | Some terminals or shells can override OSC title updates. | Try another terminal or check terminal title/profile settings. |
+| Terminal tab still ignores title changes | Some terminals or shells can override OSC title updates. The extension re-applies the last known title around Pi lifecycle events, but it cannot read a title manually set outside Pi. | Try `/rename-title <text>` so the title is recorded, or check terminal/profile settings. |
 
 ## Development
 

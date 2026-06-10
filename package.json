@@ -1,6 +1,6 @@
 {
   "name": "pi-title-renamer",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Automatically rename Pi terminal tabs after the first assistant reply.",
   "type": "module",
   "license": "MIT",

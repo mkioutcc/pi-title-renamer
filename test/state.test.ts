@@ -3,8 +3,10 @@ import { test } from "node:test";
 import { DEFAULT_CONFIG } from "../extensions/title-renamer/config.ts";
 import { buildFallbackTitle } from "../extensions/title-renamer/generator.ts";
 import {
+	blocksAutoRename,
 	getLatestResetIndex,
 	getLatestTitleRenamerState,
+	getLatestTitleToReapply,
 	hasAutoRenamed,
 	makeTitleRenamerState,
 	STATE_CUSTOM_TYPE,
@@ -82,6 +84,61 @@ test("manual rename state does not clear prior automatic rename detection", () =
 
 	assert.equal(hasAutoRenamed(entries), true);
 	assert.equal(getLatestTitleRenamerState(entries)?.title, "manual");
+});
+
+test("manual title blocks future automatic rename until reset", () => {
+	const entries = [
+		{
+			type: "custom",
+			customType: STATE_CUSTOM_TYPE,
+			data: makeTitleRenamerState({
+				autoRenamed: false,
+				title: "manual",
+				model: "inherit",
+				manual: true,
+			}),
+		},
+	];
+
+	assert.equal(blocksAutoRename(entries), true);
+	entries.push({
+		type: "custom",
+		customType: STATE_CUSTOM_TYPE,
+		data: makeTitleRenamerState({
+			autoRenamed: false,
+			model: "inherit",
+			manual: true,
+			reset: true,
+		}),
+	});
+	assert.equal(blocksAutoRename(entries), false);
+});
+
+test("latest title to reapply survives reset state", () => {
+	const entries = [
+		{
+			type: "custom",
+			customType: STATE_CUSTOM_TYPE,
+			data: makeTitleRenamerState({
+				autoRenamed: false,
+				title: "manual",
+				model: "inherit",
+				manual: true,
+			}),
+		},
+		{
+			type: "custom",
+			customType: STATE_CUSTOM_TYPE,
+			data: makeTitleRenamerState({
+				autoRenamed: false,
+				model: "inherit",
+				manual: true,
+				reset: true,
+			}),
+		},
+	];
+
+	assert.equal(getLatestTitleToReapply(entries), "manual");
 });
 
 test("buildFallbackTitle uses prefix, separator, and project name by default", () => {

@@ -3,6 +3,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TitleRenamerConfig } from "./config.ts";
 import type { NamingContext } from "./context.ts";
+import { getMessages, type UiLanguage } from "./i18n.ts";
 
 export type ParsedModelSpec =
 	| { kind: "inherit" }
@@ -13,7 +14,10 @@ export interface GeneratedTitle {
 	resolvedModel: string;
 }
 
-export function parseModelSpec(model: string): ParsedModelSpec {
+export function parseModelSpec(
+	model: string,
+	language?: UiLanguage,
+): ParsedModelSpec {
 	const trimmed = model.trim();
 	if (trimmed === "inherit") {
 		return { kind: "inherit" };
@@ -21,9 +25,7 @@ export function parseModelSpec(model: string): ParsedModelSpec {
 
 	const separatorIndex = trimmed.indexOf("/");
 	if (separatorIndex <= 0 || separatorIndex === trimmed.length - 1) {
-		throw new Error(
-			`Invalid title-renamer model ${JSON.stringify(model)}; expected "inherit" or "provider/model-id".`,
-		);
+		throw new Error(getMessages(language).generator.invalidModelSpec(model));
 	}
 
 	return {
@@ -41,12 +43,11 @@ function resolveModel(
 	ctx: ExtensionContext,
 	config: TitleRenamerConfig,
 ): Model<any> {
-	const parsed = parseModelSpec(config.model);
+	const text = getMessages(config.ui.language).generator;
+	const parsed = parseModelSpec(config.model, config.ui.language);
 	if (parsed.kind === "inherit") {
 		if (!ctx.model) {
-			throw new Error(
-				"No current Pi model is available for title-renamer model: inherit.",
-			);
+			throw new Error(text.noCurrentModel);
 		}
 		return ctx.model;
 	}
@@ -54,7 +55,7 @@ function resolveModel(
 	const model = ctx.modelRegistry.find(parsed.provider, parsed.modelId);
 	if (!model) {
 		throw new Error(
-			`Title-renamer model not found: ${parsed.provider}/${parsed.modelId}.`,
+			text.modelNotFound(`${parsed.provider}/${parsed.modelId}`),
 		);
 	}
 	return model;
@@ -274,15 +275,14 @@ export async function generateTitle(
 	config: TitleRenamerConfig,
 	input: NamingContext,
 ): Promise<GeneratedTitle> {
+	const messages = getMessages(config.ui.language).generator;
 	const model = resolveModel(ctx, config);
 	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 	if (!auth.ok) {
 		throw new Error(auth.error);
 	}
 	if (!auth.apiKey) {
-		throw new Error(
-			`No API key available for title-renamer model ${formatModelName(model)}.`,
-		);
+		throw new Error(messages.noApiKey(formatModelName(model)));
 	}
 
 	const { complete } = await import("@earendil-works/pi-ai");
@@ -291,11 +291,7 @@ export async function generateTitle(
 	const timeoutPromise = new Promise<never>((_resolve, reject) => {
 		timeout = setTimeout(() => {
 			controller.abort();
-			reject(
-				new Error(
-					`Title generation timed out after ${config.generation.timeoutMs}ms.`,
-				),
-			);
+			reject(new Error(messages.timedOut(config.generation.timeoutMs)));
 		}, config.generation.timeoutMs);
 		(timeout as { unref?: () => void }).unref?.();
 	});
@@ -338,7 +334,7 @@ export async function generateTitle(
 		.trim();
 
 	if (!text) {
-		throw new Error("Title-renamer model returned an empty response.");
+		throw new Error(messages.emptyResponse);
 	}
 
 	return {

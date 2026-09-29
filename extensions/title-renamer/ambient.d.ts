@@ -47,11 +47,13 @@ declare module "node:os" {
 declare module "node:path" {
 	function join(...parts: string[]): string;
 	function basename(filePath: string): string;
+	function dirname(filePath: string): string;
 	const path: {
 		join: typeof join;
 		basename: typeof basename;
+		dirname: typeof dirname;
 	};
-	export { join, basename };
+	export { join, basename, dirname };
 	export default path;
 }
 
@@ -98,14 +100,48 @@ declare module "@earendil-works/pi-ai" {
 declare module "@earendil-works/pi-coding-agent" {
 	import type { Model } from "@earendil-works/pi-ai";
 
+	export type ThemeColor =
+		| "accent"
+		| "border"
+		| "borderAccent"
+		| "borderMuted"
+		| "success"
+		| "error"
+		| "warning"
+		| "muted"
+		| "dim"
+		| "text";
+
+	export interface Theme {
+		fg(color: ThemeColor, text: string): string;
+		bold(text: string): string;
+	}
+
+	export interface KeybindingsManager {
+		matches(data: string, keybinding: string): boolean;
+	}
+
 	export interface ExtensionUIContext {
 		notify(message: string, type?: "info" | "warning" | "error"): void;
 		setTitle(title: string): void;
+		// Optional so lightweight test contexts can omit them.
+		select?(title: string, options: string[]): Promise<string | undefined>;
+		confirm?(title: string, message: string): Promise<boolean>;
+		input?(title: string, placeholder?: string): Promise<string | undefined>;
+		custom?<T>(
+			factory: (
+				tui: import("@earendil-works/pi-tui").TUI,
+				theme: Theme,
+				keybindings: KeybindingsManager,
+				done: (result: T) => void,
+			) => import("@earendil-works/pi-tui").Component,
+		): Promise<T>;
 	}
 
 	export interface ExtensionContext {
 		ui: ExtensionUIContext;
 		hasUI: boolean;
+		mode?: "tui" | "rpc" | "json" | "print";
 		cwd: string;
 		sessionManager: {
 			getBranch(): unknown[];
@@ -114,6 +150,7 @@ declare module "@earendil-works/pi-coding-agent" {
 		};
 		modelRegistry: {
 			find(provider: string, modelId: string): Model<any> | undefined;
+			getAvailable?(): Model<any>[];
 			getApiKeyAndHeaders(
 				model: Model<any>,
 			): Promise<

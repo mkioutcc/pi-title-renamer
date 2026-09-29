@@ -49,10 +49,27 @@ If model generation fails, the fallback title first tries to derive a short topi
 Pi｜project-name
 ```
 
+## Settings inside Pi
+
+Run `/title-renamer` to open the settings screen. Every option below can be changed there, and each change is saved right away.
+
+- **↑ / ↓** move, **Enter** or **Space** changes the selected setting, **Esc** closes.
+- On/off settings flip with one key press. Numbers and text open an inline editor that checks the value before saving.
+- **Title model** opens a searchable list of the models Pi can use. You can also type any `provider/model-id`.
+- **Interface language** switches the settings screen and all Title Renamer messages between English and 繁體中文. English is the default.
+- **Save changes to** picks where changes are written: Global (`~/.pi/agent/title-renamer.json`) or Project (`<cwd>/.pi/title-renamer.json`). If a project file already exists, it is selected when the screen opens.
+- **Reset to defaults** deletes the selected file after a second Enter to confirm.
+
+Only the setting you change is written to the file. Other keys you added by hand are kept. If the file is not valid JSON, the screen refuses to overwrite it and shows an error instead.
+
+In clients without the full terminal UI, such as RPC, the same settings are offered through simple pick and input dialogs.
+
 ## Commands
 
 | Command | Description |
 |---|---|
+| `/title-renamer` | Open the settings screen. |
+| `/rename-title --settings` | Same as `/title-renamer`. |
 | `/rename-title` | Generate a new title with the configured model and apply it immediately. |
 | `/rename-title <text>` | Use the provided text as the title without calling a model. |
 | `/rename-title --show-config` | Show the merged config, config paths, and config warnings. |
@@ -97,9 +114,12 @@ Default config:
   "auto": true,
   "trigger": "first-agent-end",
   "model": "inherit",
+  "ui": {
+    "language": "en"
+  },
   "apply": {
     "terminalTitle": true,
-    "sessionName": false,
+    "sessionName": true,
     "overwriteSessionName": false
   },
   "style": {
@@ -115,7 +135,7 @@ Default config:
     "includeModel": false
   },
   "generation": {
-    "timeoutMs": 5000
+    "timeoutMs": 15000
   },
   "fallback": {
     "useProjectName": true,
@@ -132,8 +152,9 @@ Default config:
 | `auto` | boolean | `true` | Runs automatic renaming after the configured trigger. Set to `false` if you only want manual `/rename-title` commands. |
 | `trigger` | string | `"first-agent-end"` | Automatic rename timing. Currently the only supported value is `"first-agent-end"`, meaning after the first assistant response completes. Unsupported values fall back to the default and show a config warning. |
 | `model` | string | `"inherit"` | Model used to generate titles. Use `"inherit"` for the active Pi model or `"provider/model-id"` for a specific model. |
+| `ui.language` | string | `"en"` | Language of the settings screen and Title Renamer messages. Supported values: `"en"` and `"zh-TW"`. |
 | `apply.terminalTitle` | boolean | `true` | Apply the generated title to the terminal window or tab. |
-| `apply.sessionName` | boolean | `false` | Also set Pi's session name. |
+| `apply.sessionName` | boolean | `true` | Also set Pi's session name. |
 | `apply.overwriteSessionName` | boolean | `false` | Allow automatic rename to overwrite an existing Pi session name when `apply.sessionName` is enabled. Manual `/rename-title <text>` can still update it. |
 | `style.language` | string | `"en"` | Free-form language instruction sent to the model. This is not a fixed enum. |
 | `style.maxChars` | number | `24` | Maximum title length in Unicode code points after sanitization. |
@@ -143,7 +164,7 @@ Default config:
 | `input.includeFirstAssistantMessage` | boolean | `true` | Include the first assistant response in the title-generation prompt. |
 | `input.includeCwd` | boolean | `true` | Include the current working directory in the title-generation prompt. |
 | `input.includeModel` | boolean | `false` | Include the active model name in the title-generation prompt. |
-| `generation.timeoutMs` | number | `5000` | Maximum time to wait for model title generation before falling back. |
+| `generation.timeoutMs` | number | `15000` | Maximum time to wait for model title generation before falling back. |
 | `fallback.useProjectName` | boolean | `true` | Include the project name in fallback titles. |
 | `fallback.prefix` | string | `"Pi"` | Prefix used when fallback is needed. With defaults, fallback looks like `Pi｜project-name`. |
 
@@ -167,7 +188,7 @@ To turn off automatic rename but keep manual commands:
 
 ### Title language
 
-`style.language` is a free-form language instruction sent to the model. You can use a locale code or a plain-language description.
+`style.language` is a free-form language instruction sent to the model. The settings screen switches it between English (`en`) and Chinese (`zh-TW`). In the JSON file you can use any locale code or a plain-language description.
 
 Common examples:
 
@@ -204,16 +225,24 @@ Only the first slash separates provider from model id. For example, `openrouter/
 
 ### Also rename the Pi session
 
-Terminal tab renaming is enabled by default. Pi session-name syncing is disabled by default.
+Terminal tab renaming and Pi session-name syncing are both enabled by default. Automatic renaming does not replace a session name that already exists unless `apply.overwriteSessionName` is on.
 
-To enable both:
+To also replace existing session names:
 
 ```json
 {
   "apply": {
-    "terminalTitle": true,
-    "sessionName": true,
     "overwriteSessionName": true
+  }
+}
+```
+
+To keep the session name untouched:
+
+```json
+{
+  "apply": {
+    "sessionName": false
   }
 }
 ```
@@ -246,8 +275,11 @@ To enable both:
 Run tests from the package directory:
 
 ```bash
+npm install
 npm test
 ```
+
+`test/settings.e2e.test.ts` drives the real settings screen with pi-tui keyboard input and writes every screen it visits to `test-artifacts/settings-e2e.txt`. The file is regenerated on each run and should not change unless the UI changes.
 
 Pi loads TypeScript extensions directly, so this package ships source files under `extensions/` and has no build step.
 

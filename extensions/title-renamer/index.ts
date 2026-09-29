@@ -4,6 +4,7 @@ import type {
 	ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { loadConfig, type TitleRenamerConfig } from "./config.ts";
+import { getMessages, type Messages } from "./i18n.ts";
 import {
 	collectNamingContext,
 	hasFirstTurn,
@@ -43,6 +44,7 @@ interface RenameCommandDedupe {
 }
 
 const RENAME_COMMAND_NAME = "rename-title";
+const SETTINGS_COMMAND_NAME = "title-renamer";
 const RENAME_COMMAND_TEXT = `/${RENAME_COMMAND_NAME}`;
 const COMMAND_DEDUPLICATION_MS = 500;
 const TITLE_REAPPLY_DEBOUNCE_MS = 25;
@@ -50,6 +52,19 @@ const TITLE_REAPPLY_DELAYS_MS = [0, 50, 250, 1000, 3000] as const;
 const RESET_AWARE_NAMING_CONTEXT: NamingContextOptions = {
 	afterLatestReset: true,
 };
+
+function messagesFor(config: TitleRenamerConfig): Messages {
+	return getMessages(config.ui.language);
+}
+
+/** Reads the interface language without letting a broken config stop the caller. */
+function currentMessages(cwd: string): Messages {
+	try {
+		return messagesFor(loadConfig(cwd).config);
+	} catch {
+		return getMessages(undefined);
+	}
+}
 
 function notifyWarnings(
 	ctx: ExtensionContext,
@@ -134,9 +149,7 @@ function applyTitle(
 			pi.setSessionName(title);
 			applied = true;
 		} else {
-			warnings.push(
-				"Session name already exists; set apply.overwriteSessionName to true to overwrite during auto rename.",
-			);
+			warnings.push(messagesFor(config).notify.sessionNameExists);
 		}
 	}
 
@@ -157,7 +170,12 @@ function sanitizeCandidate(
 	if (sanitized.ok) {
 		return sanitized.title;
 	}
-	warnings.push(sanitized.reason ?? "Title could not be sanitized.");
+	const text = messagesFor(config);
+	warnings.push(
+		sanitized.code
+			? text.sanitize[sanitized.code]
+			: text.notify.sanitizeFailed,
+	);
 	return undefined;
 }
 
@@ -173,9 +191,7 @@ function fallbackTitle(
 		warnings,
 	);
 	if (!fallback) {
-		warnings.push(
-			"No fallback title could be produced; leaving terminal title unchanged.",
-		);
+		warnings.push(messagesFor(config).notify.noFallback);
 	}
 	return fallback;
 }
@@ -200,11 +216,11 @@ async function renameFromModel(
 			? normalizeGeneratedTitle(sanitizedTitle, config, namingContext)
 			: undefined;
 		if (!title) {
-			warnings.push("Generated title was unusable; using fallback title.");
+			warnings.push(messagesFor(config).notify.generatedUnusable);
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		warnings.push(`Title generation failed: ${message}`);
+		warnings.push(messagesFor(config).notify.generationFailed(message));
 	}
 
 	if (!title) {
@@ -294,6 +310,12 @@ async function handleCommand(
 	const loaded = loadConfig(ctx.cwd);
 	const config = loaded.config;
 	const trimmed = args.trim();
+	const text = messagesFor(config);
+
+	if (trimmed === "--settings") {
+		await openSettingsWithErrors(ctx);
+		return;
+	}
 
 	if (trimmed === "--show-config") {
 		notifyWarnings(ctx, loaded.warnings);
@@ -316,13 +338,10 @@ async function handleCommand(
 				model: config.model,
 				manual: true,
 				reset: true,
-				warnings: ["Automatic title rename state reset."],
+				warnings: [text.notify.resetStateNote],
 			}),
 		);
-		notifyInfo(
-			ctx,
-			"Title renamer auto state reset. The next eligible agent_end can rename again.",
-		);
+		notifyInfo(ctx, text.notify.resetDone);
 		return;
 	}
 
@@ -333,9 +352,24 @@ async function handleCommand(
 	notifyWarnings(ctx, warnings);
 	recordResult(pi, config, { ...result, warnings }, true, false);
 	if (result.title && result.applied) {
-		notifyInfo(ctx, `Title renamed: ${result.title}`);
+		notifyInfo(ctx, text.notify.titleRenamed(result.title));
 	} else if (!result.title) {
-		notifyWarnings(ctx, ["No title was applied."]);
+		notifyWarnings(ctx, [text.notify.noTitleApplied]);
+	}
+}
+
+async function openSettingsWithErrors(ctx: ExtensionContext): Promise<void> {
+	try {
+		const { openSettings } = await import("./settings-command.ts");
+		await openSettings(ctx);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (ctx.hasUI) {
+			ctx.ui.notify(
+				currentMessages(ctx.cwd).notify.settingsFailed(message),
+				"warning",
+			);
+		}
 	}
 }
 
@@ -419,7 +453,7 @@ export default function titleRenamer(pi: ExtensionAPI): void {
 			const message = error instanceof Error ? error.message : String(error);
 			if (ctx.hasUI) {
 				ctx.ui.notify(
-					`Title renamer skipped after an internal error: ${message}`,
+					currentMessages(ctx.cwd).notify.autoInternalError(message),
 					"warning",
 				);
 			}
@@ -445,7 +479,7 @@ export default function titleRenamer(pi: ExtensionAPI): void {
 			const message = error instanceof Error ? error.message : String(error);
 			if (ctx.hasUI) {
 				ctx.ui.notify(
-					`Title renamer input fallback failed: ${message}`,
+					currentMessages(ctx.cwd).notify.inputFallbackFailed(message),
 					"warning",
 				);
 			}
@@ -453,17 +487,29 @@ export default function titleRenamer(pi: ExtensionAPI): void {
 		return { action: "handled" };
 	});
 
+	const startupText = currentMessages(process.cwd());
+
 	pi.registerCommand(RENAME_COMMAND_NAME, {
-		description: "Generate, set, inspect, or reset the Pi terminal title",
+		description: startupText.commands.renameTitle,
 		handler: async (args, ctx) => {
 			try {
 				await runRenameCommand(pi, args, ctx, commandDedupe, "command");
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				if (ctx.hasUI) {
-					ctx.ui.notify(`Title renamer command failed: ${message}`, "warning");
+					ctx.ui.notify(
+						currentMessages(ctx.cwd).notify.commandFailed(message),
+						"warning",
+					);
 				}
 			}
+		},
+	});
+
+	pi.registerCommand(SETTINGS_COMMAND_NAME, {
+		description: startupText.commands.settings,
+		handler: async (_args, ctx) => {
+			await openSettingsWithErrors(ctx);
 		},
 	});
 }

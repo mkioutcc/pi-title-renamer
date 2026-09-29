@@ -2,10 +2,13 @@ export interface SanitizeOptions {
 	maxChars: number;
 }
 
+export type SanitizeFailure = "notString" | "invalidMaxChars" | "empty";
+
 export interface SanitizedTitle {
 	ok: boolean;
 	title?: string;
 	reason?: string;
+	code?: SanitizeFailure;
 }
 
 const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1B\\))/g;
@@ -70,10 +73,14 @@ function truncateTitle(title: string, maxChars: number): string {
 
 export function sanitizeTitle(input: unknown, options: SanitizeOptions): SanitizedTitle {
 	if (typeof input !== "string") {
-		return { ok: false, reason: "Title is not a string." };
+		return { ok: false, reason: "Title is not a string.", code: "notString" };
 	}
 	if (!Number.isInteger(options.maxChars) || options.maxChars <= 0) {
-		return { ok: false, reason: "maxChars must be a positive integer." };
+		return {
+			ok: false,
+			reason: "maxChars must be a positive integer.",
+			code: "invalidMaxChars",
+		};
 	}
 
 	const normalized = input.replace(ANSI_ESCAPE_PATTERN, "").replace(CONTROL_PATTERN, "");
@@ -90,5 +97,9 @@ export function sanitizeTitle(input: unknown, options: SanitizeOptions): Sanitiz
 		return { ok: true, title: cleaned };
 	}
 
-	return { ok: false, reason: "Title is empty after sanitization." };
+	return {
+		ok: false,
+		reason: "Title is empty after sanitization.",
+		code: "empty",
+	};
 }

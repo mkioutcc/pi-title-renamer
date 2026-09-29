@@ -1,10 +1,20 @@
 # pi-title-renamer
 
-`pi-title-renamer` is a Pi package that automatically renames the terminal tab after the first assistant reply in a session.
+`pi-title-renamer` is a Pi package that automatically renames the terminal tab and the Pi session after the first assistant reply in a session.
+
+All options can be changed inside Pi with `/title-renamer`, in English or 繁體中文.
 
 It is meant for people who keep several Pi sessions open and want each terminal tab to show the conversation topic instead of only the working directory. After a title has been applied, the extension also re-applies the last known title around Pi lifecycle events so Pi's default terminal-title updates are less likely to overwrite it.
 
 Repository: <https://github.com/mkioutcc/pi-title-renamer>
+
+## What's new in 0.2.0
+
+- **Settings screen inside Pi.** Run `/title-renamer` (or `/rename-title --settings`) to change every option without editing JSON.
+- **English and Chinese interface.** The new `ui.language` setting switches the settings screen and all messages between `en` (default) and `zh-TW`.
+- **Session name is now on by default.** `apply.sessionName` changed from `false` to `true`, so the generated title is also saved as the Pi session name. An existing session name is still kept unless `apply.overwriteSessionName` is on.
+
+> **Upgrading from 0.1.x:** if you do not want Pi session names to change, turn off **Session name** in `/title-renamer`, or set `"apply": { "sessionName": false }` in your config.
 
 ## Install
 
@@ -92,6 +102,8 @@ Manual `/rename-title <text>` titles are treated as user-owned and block automat
 ## Configuration
 
 Configuration is optional. If no config file exists, defaults are used.
+
+The easiest way to change settings is `/title-renamer` (see [Settings inside Pi](#settings-inside-pi)). You can also edit the JSON files below by hand; both ways use the same files.
 
 Config is loaded from two places:
 
